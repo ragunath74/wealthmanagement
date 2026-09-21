@@ -25,6 +25,7 @@ public class AdvisorController {
         Advisor advisor = new Advisor();
         advisor.setDisplayName(request.displayName());
         advisor.setEmail(request.email());
+        System.out.println("test");
         return AdvisorResponse.from(advisorRepository.save(advisor));
     }
 
