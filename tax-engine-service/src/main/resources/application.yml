@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: tax-engine-service
+  main:
+    web-application-type: none # gRPC-only service -- no embedded servlet container, no spring-boot-starter-web(mvc) on the classpath
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9092}
+
+logging:
+  level:
+    com.wealthtech.rebalance: INFO

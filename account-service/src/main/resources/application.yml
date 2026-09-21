@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: account-service
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:account_service}?useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      connection-timeout: 5000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Lets this service boot cleanly whether the schema was created by Flyway itself (empty DB,
+    # normal case) OR pre-loaded by sql/full-schema.sql (e.g. MySQL's docker-entrypoint-initdb.d,
+    # or a manual `mysql < sql/full-schema.sql` run) -- in the second case Flyway finds the V1
+    # tables already present with no history row and just baselines instead of failing.
+    baseline-on-migrate: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 5
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+
+server:
+  port: ${SERVER_PORT:8081}
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.wealthtech.rebalance: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:account_service;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false

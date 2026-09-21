@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package wealthtech.account.v1;
+
+option java_package = "com.wealthtech.rebalance.grpc.account";
+option java_multiple_files = true;
+option java_outer_classname = "AccountProto";
+
+// Owned and served by account-service. This is the ONLY way another service
+// may read account/position/reference data -- no service reaches into
+// account-service's MySQL schema directly. All money/decimal fields are
+// transmitted as strings (BigDecimal.toPlainString()) rather than double, to
+// avoid floating-point rounding in financial arithmetic; a production system
+// would more likely use a fixed-point/scaled-integer representation or
+// google.type.Money for a stronger wire-level contract.
+service AccountService {
+  // Unary RPC: point read of one account's full position snapshot.
+  rpc GetAccountSnapshot(GetAccountSnapshotRequest) returns (AccountSnapshot);
+
+  // Server-streaming RPC: keyset-paginated account ids mapped to a model
+  // portfolio, streamed page-by-page so the caller (drift-engine-service)
+  // never has to hold all 2M ids in memory nor wait for the whole result
+  // before starting work.
+  rpc ListAccountIdsForModel(ListAccountIdsForModelRequest) returns (stream AccountIdBatch);
+
+  // Server-streaming RPC: same pattern, keyed by security instead of model,
+  // used for the price-move-driven fan-out.
+  rpc ListAccountIdsHoldingSecurity(ListAccountIdsHoldingSecurityRequest) returns (stream AccountIdBatch);
+
+  rpc GetSecurityBySymbol(GetSecurityBySymbolRequest) returns (SecurityMsg);
+}
+
+message GetAccountSnapshotRequest {
+  string account_id = 1;
+}
+
+message AccountSnapshot {
+  string account_id = 1;
+  string advisor_id = 2;
+  string model_portfolio_id = 3;
+  int64 model_revision = 4;
+  string cash_balance = 5;
+  bool taxable = 6;
+  bool tax_loss_harvesting_enabled = 7;
+  repeated TaxLotMsg open_lots = 8;
+  repeated ModelTargetMsg model_targets = 9;
+}
+
+message TaxLotMsg {
+  string lot_id = 1;
+  string security_id = 2;
+  string symbol = 3;
+  string quantity = 4;
+  string cost_basis_per_share = 5;
+  string acquired_date = 6; // ISO-8601 local date
+  string last_price = 7;
+  string wash_sale_replacement_symbol = 8;
+}
+
+message ModelTargetMsg {
+  string security_id = 1;
+  string symbol = 2;
+  string target_weight = 3;
+  string last_price = 4;
+  string wash_sale_replacement_symbol = 5;
+}
+
+message SecurityMsg {
+  string security_id = 1;
+  string symbol = 2;
+  string last_price = 3;
+  string wash_sale_replacement_symbol = 4;
+}
+
+message ListAccountIdsForModelRequest {
+  string model_portfolio_id = 1;
+  int32 page_size = 2;
+}
+
+message ListAccountIdsHoldingSecurityRequest {
+  string security_id = 1;
+  int32 page_size = 2;
+}
+
+// One page of the keyset-paginated scan. is_last lets the client stop
+// without waiting for the stream's onCompleted if it wants to short-circuit.
+message AccountIdBatch {
+  repeated string account_ids = 1;
+  bool is_last = 2;
+}
+
+message GetSecurityBySymbolRequest {
+  string symbol = 1;
+}

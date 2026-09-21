@@ -1,0 +1,104 @@
+spring:
+  application:
+    name: drift-engine-service
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:drift_engine_service}?useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      connection-timeout: 5000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true # see account-service/application.yml for why
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 5
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  task:
+    execution:
+      pool:
+        core-size: 8
+        max-size: 32
+        queue-capacity: 1000
+
+server:
+  port: ${SERVER_PORT:8083}
+
+grpc:
+  client:
+    account-service:
+      host: ${ACCOUNT_SERVICE_GRPC_HOST:localhost}
+      port: ${ACCOUNT_SERVICE_GRPC_PORT:9091}
+    tax-engine-service:
+      host: ${TAX_ENGINE_SERVICE_GRPC_HOST:localhost}
+      port: ${TAX_ENGINE_SERVICE_GRPC_PORT:9092}
+
+rebalance:
+  drift-threshold-bps: 500
+  min-trade-amount: 25
+  cash-buffer-pct: 0.005
+  dispatch-page-size: 500
+  lock-wait-seconds: 5
+  price-move-dispatch-threshold-bps: 100
+  account-rebalance-consumer-concurrency: 6
+
+tax-rules:
+  wash-sale-window-days: 30
+  default-lot-selection-strategy: TAX_OPTIMAL
+  min-harvest-loss: 50
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.wealthtech.rebalance: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:drift_engine_service;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false

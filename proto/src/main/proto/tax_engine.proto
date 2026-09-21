@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package wealthtech.taxengine.v1;
+
+import "account.proto";
+
+option java_package = "com.wealthtech.rebalance.grpc.taxengine";
+option java_multiple_files = true;
+option java_outer_classname = "TaxEngineProto";
+
+// tax-engine-service is a stateless compute service: no database, no Kafka.
+// Everything it needs to make a decision is passed in on the request, and
+// everything it decides is returned in the response -- this is what makes it
+// trivially horizontally scalable (any replica can answer any request) and
+// easy to unit-test/mock from drift-engine-service.
+service TaxOptimizationService {
+  // Combines tax-loss harvesting + drift-based rebalancing + cash-constraint
+  // sizing into the final BUY/SELL list for one account (mirrors
+  // TradeGenerationService from the original monolith, now living here to
+  // match the reference architecture's "Tax & Optimization Service" node).
+  rpc GenerateTrades(GenerateTradesRequest) returns (GenerateTradesResponse);
+}
+
+message GenerateTradesRequest {
+  string account_id = 1;
+  bool taxable = 2;
+  bool tax_loss_harvesting_enabled = 3;
+  string cash_balance = 4;
+  repeated wealthtech.account.v1.TaxLotMsg open_lots = 5;
+  repeated wealthtech.account.v1.ModelTargetMsg model_targets = 6;
+  repeated wealthtech.account.v1.SecurityMsg replacement_securities = 7; // resolved wash-sale substitutes, keyed by symbol
+
+  string drift_threshold_bps = 8;
+  string min_trade_amount = 9;
+  string cash_buffer_pct = 10;
+  int32 wash_sale_window_days = 11;
+  string min_harvest_loss = 12;
+  string lot_selection_strategy = 13; // FIFO | LIFO | HIFO | TAX_OPTIMAL
+  string as_of_date = 14;             // ISO-8601 local date
+}
+
+message LotAllocationMsg {
+  string lot_id = 1;
+  string quantity = 2;
+  string realized_gain_loss = 3;
+  bool long_term = 4;
+}
+
+message GeneratedTradeMsg {
+  string security_id = 1;
+  string symbol = 2;
+  string side = 3; // BUY | SELL
+  string quantity = 4;
+  string reference_price = 5;
+  string reason = 6; // DRIFT_REBALANCE | TAX_LOSS_HARVEST
+  repeated LotAllocationMsg lot_allocations = 7; // populated for SELL only
+}
+
+message GenerateTradesResponse {
+  repeated GeneratedTradeMsg trades = 1;
+}
